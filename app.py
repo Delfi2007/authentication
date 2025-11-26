@@ -12,7 +12,10 @@ from google_auth_oauthlib.flow import Flow
 from face_api import FacePlusPlusAPI
 from database import (init_db, create_user, get_user_by_username, update_user_face_status, 
                      log_login_attempt, update_last_login, get_all_users, get_user_login_attempts,
-                     create_google_user, get_user_by_google_id)
+                     create_google_user, get_user_by_google_id, create_email_password_user, 
+                     authenticate_user, get_user_by_email, enable_two_factor, disable_two_factor,
+                     send_otp, verify_user_otp)
+from otp_service import otp_service
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'
@@ -108,6 +111,53 @@ HTML_TEMPLATE = """
         <div id="googleLoginResult"></div>
         <p style="font-size: 12px; color: #666; margin-top: 10px;">
             💡 After Google login, you can optionally register your face for even faster future logins!
+        </p>
+    </div>
+
+    <div class="container" style="background: #fff3e0; border: 2px solid #ffb74d;">
+        <h2>📧 Email & Password Authentication</h2>
+        <h3>Register New Account</h3>
+        <input type="text" id="emailRegUsername" placeholder="Username" style="padding: 10px; margin: 5px; width: 250px;"><br>
+        <input type="email" id="emailRegEmail" placeholder="Email" style="padding: 10px; margin: 5px; width: 250px;"><br>
+        <input type="password" id="emailRegPassword" placeholder="Password" style="padding: 10px; margin: 5px; width: 250px;"><br>
+        <input type="text" id="emailRegFullName" placeholder="Full Name (optional)" style="padding: 10px; margin: 5px; width: 250px;"><br>
+        <button class="button" onclick="registerWithEmail()" style="background: #ff9800;">📝 Register with Email</button>
+        <div id="emailRegResult"></div>
+        
+        <hr style="margin: 20px 0;">
+        
+        <h3>Login with Email</h3>
+        <input type="email" id="emailLoginEmail" placeholder="Email" style="padding: 10px; margin: 5px; width: 250px;"><br>
+        <input type="password" id="emailLoginPassword" placeholder="Password" style="padding: 10px; margin: 5px; width: 250px;"><br>
+        <button class="button" onclick="loginWithEmail()" style="background: #ff9800;">🔑 Login with Email</button>
+        <div id="emailLoginResult"></div>
+        <p style="font-size: 12px; color: #666; margin-top: 10px;">
+            💡 After email login, you can register your face for multi-factor authentication!
+        </p>
+    </div>
+
+    <div class="container" style="background: #f3e5f5; border: 2px solid #ab47bc;">
+        <h2>🔒 Two-Factor Authentication (2FA)</h2>
+        <p><strong>Add extra security with phone verification</strong></p>
+        
+        <h3>Enable 2FA</h3>
+        <input type="text" id="twoFactorUsername" placeholder="Your Username" style="padding: 10px; margin: 5px; width: 250px;"><br>
+        <input type="tel" id="twoFactorPhone" placeholder="Phone Number (e.g., +1234567890)" style="padding: 10px; margin: 5px; width: 250px;"><br>
+        <button class="button" onclick="enableTwoFactor()" style="background: #9c27b0;">🔐 Enable 2FA</button>
+        <div id="twoFactorEnableResult"></div>
+        
+        <hr style="margin: 20px 0;">
+        
+        <h3>Verify OTP</h3>
+        <p style="font-size: 14px; color: #666;">Enter the 6-digit code sent to your phone</p>
+        <input type="text" id="otpUsername" placeholder="Username" style="padding: 10px; margin: 5px; width: 250px;"><br>
+        <input type="text" id="otpCode" placeholder="Enter 6-digit OTP" maxlength="6" style="padding: 10px; margin: 5px; width: 250px; font-size: 18px; letter-spacing: 5px; text-align: center;"><br>
+        <button class="button" onclick="verifyOTP()" style="background: #9c27b0;">✅ Verify OTP</button>
+        <button class="button" onclick="requestOTP()" style="background: #757575;">📲 Resend OTP</button>
+        <div id="otpVerifyResult"></div>
+        
+        <p style="font-size: 12px; color: #666; margin-top: 10px;">
+            🔐 2FA adds an extra layer of security by requiring a code sent to your phone!
         </p>
     </div>
 
@@ -389,6 +439,181 @@ HTML_TEMPLATE = """
             } catch (error) {
                 document.getElementById('googleLoginResult').innerHTML = 
                     '<div class="result error">Google login error: ' + error.message + '</div>';
+            }
+        }
+
+        async function registerWithEmail() {
+            const username = document.getElementById('emailRegUsername').value;
+            const email = document.getElementById('emailRegEmail').value;
+            const password = document.getElementById('emailRegPassword').value;
+            const fullName = document.getElementById('emailRegFullName').value;
+
+            if (!username || !email || !password) {
+                document.getElementById('emailRegResult').innerHTML = 
+                    '<div class="result error">Please fill in username, email, and password</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/auth/email/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password, full_name: fullName })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('emailRegResult').innerHTML = 
+                        '<div class="result success">' + result.message + '</div>';
+                    // Clear form
+                    document.getElementById('emailRegUsername').value = '';
+                    document.getElementById('emailRegEmail').value = '';
+                    document.getElementById('emailRegPassword').value = '';
+                    document.getElementById('emailRegFullName').value = '';
+                } else {
+                    document.getElementById('emailRegResult').innerHTML = 
+                        '<div class="result error">' + result.message + '</div>';
+                }
+            } catch (error) {
+                document.getElementById('emailRegResult').innerHTML = 
+                    '<div class="result error">Registration error: ' + error.message + '</div>';
+            }
+        }
+
+        async function loginWithEmail() {
+            const email = document.getElementById('emailLoginEmail').value;
+            const password = document.getElementById('emailLoginPassword').value;
+
+            if (!email || !password) {
+                document.getElementById('emailLoginResult').innerHTML = 
+                    '<div class="result error">Please enter email and password</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/auth/email/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('emailLoginResult').innerHTML = 
+                        '<div class="result success">' + result.message + 
+                        '<br>Welcome back, ' + result.user.username + '!</div>';
+                    // Clear form
+                    document.getElementById('emailLoginEmail').value = '';
+                    document.getElementById('emailLoginPassword').value = '';
+                } else {
+                    document.getElementById('emailLoginResult').innerHTML = 
+                        '<div class="result error">' + result.message + '</div>';
+                }
+            } catch (error) {
+                document.getElementById('emailLoginResult').innerHTML = 
+                    '<div class="result error">Login error: ' + error.message + '</div>';
+            }
+        }
+
+        async function enableTwoFactor() {
+            const username = document.getElementById('twoFactorUsername').value;
+            const phoneNumber = document.getElementById('twoFactorPhone').value;
+
+            if (!username || !phoneNumber) {
+                document.getElementById('twoFactorEnableResult').innerHTML = 
+                    '<div class="result error">Please enter username and phone number</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/auth/2fa/enable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, phone_number: phoneNumber })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('twoFactorEnableResult').innerHTML = 
+                        '<div class="result success">' + result.message + 
+                        '<br>📱 Check your terminal/console for the OTP code!</div>';
+                } else {
+                    document.getElementById('twoFactorEnableResult').innerHTML = 
+                        '<div class="result error">' + result.message + '</div>';
+                }
+            } catch (error) {
+                document.getElementById('twoFactorEnableResult').innerHTML = 
+                    '<div class="result error">2FA error: ' + error.message + '</div>';
+            }
+        }
+
+        async function requestOTP() {
+            const username = document.getElementById('otpUsername').value;
+
+            if (!username) {
+                document.getElementById('otpVerifyResult').innerHTML = 
+                    '<div class="result error">Please enter username</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/auth/2fa/request-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('otpVerifyResult').innerHTML = 
+                        '<div class="result success">' + result.message + 
+                        '<br>📱 Check your terminal/console for the OTP code!</div>';
+                } else {
+                    document.getElementById('otpVerifyResult').innerHTML = 
+                        '<div class="result error">' + result.message + '</div>';
+                }
+            } catch (error) {
+                document.getElementById('otpVerifyResult').innerHTML = 
+                    '<div class="result error">OTP request error: ' + error.message + '</div>';
+            }
+        }
+
+        async function verifyOTP() {
+            const username = document.getElementById('otpUsername').value;
+            const otp = document.getElementById('otpCode').value;
+
+            if (!username || !otp) {
+                document.getElementById('otpVerifyResult').innerHTML = 
+                    '<div class="result error">Please enter username and OTP code</div>';
+                return;
+            }
+
+            if (otp.length !== 6) {
+                document.getElementById('otpVerifyResult').innerHTML = 
+                    '<div class="result error">OTP must be 6 digits</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/auth/2fa/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, otp })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('otpVerifyResult').innerHTML = 
+                        '<div class="result success">✅ ' + result.message + 
+                        '<br>🎉 Two-factor authentication successful!</div>';
+                    document.getElementById('otpCode').value = '';
+                } else {
+                    document.getElementById('otpVerifyResult').innerHTML = 
+                        '<div class="result error">' + result.message + '</div>';
+                }
+            } catch (error) {
+                document.getElementById('otpVerifyResult').innerHTML = 
+                    '<div class="result error">Verification error: ' + error.message + '</div>';
             }
         }
     </script>
@@ -781,6 +1006,273 @@ def logout():
     """Logout user"""
     session.clear()
     return redirect(url_for('index'))
+
+@app.route('/auth/email/register', methods=['POST'])
+def email_register():
+    """Register new user with email and password"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        full_name = data.get('full_name')
+        
+        if not username or not email or not password:
+            return jsonify({'success': False, 'message': 'Username, email, and password are required'})
+        
+        # Validate email format
+        if '@' not in email or '.' not in email:
+            return jsonify({'success': False, 'message': 'Invalid email format'})
+        
+        # Validate password length
+        if len(password) < 6:
+            return jsonify({'success': False, 'message': 'Password must be at least 6 characters long'})
+        
+        # Create user
+        user, message = create_email_password_user(username, email, password, full_name)
+        
+        if user:
+            # Log registration
+            log_login_attempt(
+                user_id=user.id,
+                attempted_username=username,
+                success=True,
+                method='email_registration',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': f'Account created successfully! You can now login with your email and password.',
+                'user': user.to_dict()
+            })
+        else:
+            return jsonify({'success': False, 'message': message})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Registration error: {str(e)}'})
+
+@app.route('/auth/email/login', methods=['POST'])
+def email_login():
+    """Login with email and password"""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return jsonify({'success': False, 'message': 'Email and password are required'})
+        
+        # Authenticate user
+        user, message = authenticate_user(email, password)
+        
+        if user:
+            # Store user info in session
+            session['user_id'] = user.id
+            session['user_email'] = user.email
+            session['user_name'] = user.full_name or user.username
+            session['auth_method'] = user.auth_method
+            
+            # Update last login
+            update_last_login(user.username)
+            
+            # Log successful login
+            log_login_attempt(
+                user_id=user.id,
+                attempted_username=user.username,
+                success=True,
+                method='email_password',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Login successful!',
+                'user': user.to_dict()
+            })
+        else:
+            # Log failed login attempt
+            log_login_attempt(
+                user_id=None,
+                attempted_username=email,
+                success=False,
+                method='email_password',
+                error_message=message,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            
+            return jsonify({'success': False, 'message': message})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Login error: {str(e)}'})
+
+@app.route('/auth/2fa/enable', methods=['POST'])
+def enable_2fa():
+    """Enable two-factor authentication for a user"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        phone_number = data.get('phone_number')
+        
+        if not username or not phone_number:
+            return jsonify({'success': False, 'message': 'Username and phone number are required'})
+        
+        # Get user
+        user = get_user_by_username(username)
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found'})
+        
+        # Enable 2FA
+        success, message = enable_two_factor(username, phone_number)
+        
+        if success:
+            # Generate and send OTP
+            otp_success, otp = send_otp(user)
+            if otp_success:
+                # Send OTP via service
+                send_success, send_message = otp_service.send_otp(
+                    phone_number, 
+                    otp, 
+                    user.email, 
+                    user.username
+                )
+                
+                if send_success:
+                    return jsonify({
+                        'success': True,
+                        'message': f'Two-factor authentication enabled! {send_message}'
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': f'2FA enabled but failed to send OTP: {send_message}'
+                    })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to generate OTP'
+                })
+        else:
+            return jsonify({'success': False, 'message': message})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'2FA error: {str(e)}'})
+
+@app.route('/auth/2fa/request-otp', methods=['POST'])
+def request_otp():
+    """Request OTP for 2FA verification"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        
+        if not username:
+            return jsonify({'success': False, 'message': 'Username is required'})
+        
+        # Get user
+        user = get_user_by_username(username)
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found'})
+        
+        if not user.two_factor_enabled:
+            return jsonify({'success': False, 'message': 'Two-factor authentication is not enabled for this user'})
+        
+        # Generate and send OTP
+        success, otp = send_otp(user)
+        if success:
+            # Send OTP via service
+            send_success, send_message = otp_service.send_otp(
+                user.phone_number, 
+                otp, 
+                user.email, 
+                user.username
+            )
+            
+            if send_success:
+                return jsonify({
+                    'success': True,
+                    'message': f'OTP sent! {send_message}'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': f'Failed to send OTP: {send_message}'
+                })
+        else:
+            return jsonify({'success': False, 'message': 'Failed to generate OTP'})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'OTP request error: {str(e)}'})
+
+@app.route('/auth/2fa/verify-otp', methods=['POST'])
+def verify_otp():
+    """Verify OTP for 2FA"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        otp = data.get('otp')
+        
+        if not username or not otp:
+            return jsonify({'success': False, 'message': 'Username and OTP are required'})
+        
+        # Verify OTP
+        success, message = verify_user_otp(username, otp)
+        
+        if success:
+            # Log successful 2FA
+            user = get_user_by_username(username)
+            log_login_attempt(
+                user_id=user.id if user else None,
+                attempted_username=username,
+                success=True,
+                method='2fa_otp',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'OTP verified successfully!'
+            })
+        else:
+            # Log failed 2FA
+            user = get_user_by_username(username)
+            log_login_attempt(
+                user_id=user.id if user else None,
+                attempted_username=username,
+                success=False,
+                method='2fa_otp',
+                error_message=message,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            
+            return jsonify({'success': False, 'message': message})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Verification error: {str(e)}'})
+
+@app.route('/auth/2fa/disable', methods=['POST'])
+def disable_2fa():
+    """Disable two-factor authentication for a user"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        
+        if not username:
+            return jsonify({'success': False, 'message': 'Username is required'})
+        
+        success, message = disable_two_factor(username)
+        
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'message': message})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error disabling 2FA: {str(e)}'})
 
 if __name__ == '__main__':
     # Ensure user_faces directory exists

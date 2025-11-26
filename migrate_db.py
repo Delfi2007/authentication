@@ -40,6 +40,14 @@ def migrate_database():
         else:
             print("✓ avatar_url column already exists")
         
+        # Add password_hash column if it doesn't exist
+        if 'password_hash' not in columns:
+            print("Adding password_hash column...")
+            cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+            print("✓ password_hash column added")
+        else:
+            print("✓ password_hash column already exists")
+        
         # Commit changes
         conn.commit()
         print("\n✅ Database migration completed successfully!")
