@@ -1,22 +1,34 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for
 from flask_cors import CORS
+from flask_session import Session
 import os
 import base64
-import cv2
-import numpy as np
-from PIL import Image
-import io
+import json
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from google_auth_oauthlib.flow import Flow
 
 # Import our custom modules
 from face_api import FacePlusPlusAPI
-from database import init_db, create_user, get_user_by_username, update_user_face_status, log_login_attempt, update_last_login, get_all_users, get_user_login_attempts
+from database import (init_db, create_user, get_user_by_username, update_user_face_status, 
+                     log_login_attempt, update_last_login, get_all_users, get_user_login_attempts,
+                     create_google_user, get_user_by_google_id)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///face_auth.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max for image data
+
+# Session configuration
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = False
+Session(app)
+
+# Google OAuth Configuration
+app.config['GOOGLE_CLIENT_ID'] = '1001852997221-lekla2rgordhmbp46lf3c0dpvtmi5nb5.apps.googleusercontent.com'
+app.config['GOOGLE_CLIENT_SECRET'] = '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'
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'  # For development only
 
 # Enable CORS for all routes
 CORS(app)
@@ -86,8 +98,22 @@ HTML_TEMPLATE = """
         <div id="cameraResult"></div>
     </div>
 
+    <div class="container" style="background: #e3f2fd; border: 2px solid #81c784;">
+        <h2>🌐 Google Login</h2>
+        <p><strong>Quick & Secure Authentication</strong></p>
+        <p>Login with your Google account instantly - No registration required!</p>
+        <button class="button" onclick="loginWithGoogle()" style="background: #db4437; color: white; font-size: 16px; padding: 12px 24px;">
+            🔑 Login with Google
+        </button>
+        <div id="googleLoginResult"></div>
+        <p style="font-size: 12px; color: #666; margin-top: 10px;">
+            💡 After Google login, you can optionally register your face for even faster future logins!
+        </p>
+    </div>
+
     <div class="container">
-        <h2>👤 User Registration</h2>
+        <h2>👤 Manual User Registration</h2>
+        <p><strong>Register with face recognition only (no Google account needed)</strong></p>
         <input type="text" id="registerUsername" placeholder="Username" style="padding: 10px; margin: 5px; width: 200px;">
         <input type="email" id="registerEmail" placeholder="Email (optional)" style="padding: 10px; margin: 5px; width: 200px;">
         <input type="text" id="registerName" placeholder="Full Name (optional)" style="padding: 10px; margin: 5px; width: 200px;"><br>
@@ -355,47 +381,20 @@ HTML_TEMPLATE = """
                 reader.onerror = error => reject(error);
             });
         }
+
+        async function loginWithGoogle() {
+            try {
+                // Redirect to Google OAuth
+                window.location.href = '/auth/google';
+            } catch (error) {
+                document.getElementById('googleLoginResult').innerHTML = 
+                    '<div class="result error">Google login error: ' + error.message + '</div>';
+            }
+        }
     </script>
 </body>
 </html>
 """
-
-def process_image_data(image_data):
-    """Process image data from various formats"""
-    try:
-        # Handle base64 encoded data
-        if isinstance(image_data, str) and image_data.startswith('data:image'):
-            # Remove data URL prefix
-            image_data = image_data.split(',')[1]
-            image_bytes = base64.b64decode(image_data)
-        elif hasattr(image_data, 'read'):
-            # Handle file objects
-            image_bytes = image_data.read()
-        else:
-            # Assume it's already bytes
-            image_bytes = image_data
-        
-        # Convert to numpy array
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # Resize image if too large (to reduce processing time and memory)
-        max_size = 1024
-        if max(image.size) > max_size:
-            ratio = max_size / max(image.size)
-            new_size = tuple(int(dim * ratio) for dim in image.size)
-            image = image.resize(new_size, Image.Resampling.LANCZOS)
-        
-        # Convert to RGB if necessary
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        image_array = np.array(image)
-        
-        return image_array
-    
-    except Exception as e:
-        print(f"Error processing image data: {str(e)}")
-        return None
 
 @app.route('/')
 def index():
@@ -418,18 +417,13 @@ def register_user():
         if not image_data:
             return jsonify({'success': False, 'message': 'Image is required'})
         
-        # Process image
-        image_array = process_image_data(image_data)
-        if image_array is None:
-            return jsonify({'success': False, 'message': 'Failed to process image'})
-        
         # Create user in database
         user, message = create_user(username, email if email else None, full_name if full_name else None)
         if not user:
             return jsonify({'success': False, 'message': message})
         
         # Register face
-        success, face_message = face_system.register_face(username, image_array)
+        success, result_message = face_system.register_face(username, image_data)
         
         if success:
             # Update user's face registration status
@@ -457,12 +451,12 @@ def register_user():
                 attempted_username=username,
                 success=False,
                 method='face_registration',
-                error_message=face_message,
+                error_message=result_message,
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get('User-Agent')
             )
             
-            return jsonify({'success': False, 'message': face_message})
+            return jsonify({'success': False, 'message': result_message})
     
     except Exception as e:
         return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
@@ -476,13 +470,8 @@ def login_user():
         if not image_data:
             return jsonify({'success': False, 'message': 'Image is required'})
         
-        # Process image
-        image_array = process_image_data(image_data)
-        if image_array is None:
-            return jsonify({'success': False, 'message': 'Failed to process image'})
-        
         # Recognize face
-        username, confidence, message = face_system.recognize_face(image_array)
+        username, confidence, message = face_system.recognize_face(image_data)
         
         if username:
             # Get user from database
@@ -623,9 +612,178 @@ def health_check():
         'version': '1.0.0'
     })
 
+# Google OAuth Routes
+@app.route('/auth/google')
+def google_login():
+    """Initiate Google OAuth flow"""
+    try:
+        # Create client configuration
+        client_config = {
+            "web": {
+                "client_id": app.config['GOOGLE_CLIENT_ID'],
+                "client_secret": app.config['GOOGLE_CLIENT_SECRET'],
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [url_for('google_callback', _external=True)]
+            }
+        }
+        
+        flow = Flow.from_client_config(
+            client_config,
+            scopes=['openid', 'https://www.googleapis.com/auth/userinfo.email', 
+                   'https://www.googleapis.com/auth/userinfo.profile']
+        )
+        
+        flow.redirect_uri = url_for('google_callback', _external=True)
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true'
+        )
+        
+        session['state'] = state
+        return redirect(authorization_url)
+    
+    except Exception as e:
+        return f"Error initiating Google login: {str(e)}<br><a href='/'>Go back</a>"
+
+@app.route('/auth/google/callback')
+def google_callback():
+    """Handle Google OAuth callback"""
+    try:
+        # Verify state
+        if 'state' not in session or request.args.get('state') != session['state']:
+            return "Invalid state parameter<br><a href='/'>Go back</a>", 400
+        
+        # Create flow
+        client_config = {
+            "web": {
+                "client_id": app.config['GOOGLE_CLIENT_ID'],
+                "client_secret": app.config['GOOGLE_CLIENT_SECRET'],
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [url_for('google_callback', _external=True)]
+            }
+        }
+        
+        flow = Flow.from_client_config(
+            client_config,
+            scopes=['openid', 'https://www.googleapis.com/auth/userinfo.email',
+                   'https://www.googleapis.com/auth/userinfo.profile'],
+            state=session['state']
+        )
+        
+        flow.redirect_uri = url_for('google_callback', _external=True)
+        flow.fetch_token(authorization_response=request.url)
+        
+        # Get user info
+        credentials = flow.credentials
+        request_session = google_requests.Request()
+        
+        id_info = id_token.verify_oauth2_token(
+            credentials.id_token,
+            request_session,
+            app.config['GOOGLE_CLIENT_ID']
+        )
+        
+        # Extract user information
+        google_id = id_info.get('sub')
+        email = id_info.get('email')
+        full_name = id_info.get('name')
+        avatar_url = id_info.get('picture')
+        
+        # Create or get Google user
+        user, message = create_google_user(google_id, email, full_name, avatar_url)
+        
+        if user:
+            # Store user info in session
+            session['user_id'] = user.id
+            session['user_email'] = user.email
+            session['user_name'] = user.full_name
+            session['avatar_url'] = user.avatar_url
+            session['auth_method'] = user.auth_method
+            
+            # Update last login
+            update_last_login(user.username)
+            
+            # Log successful login
+            log_login_attempt(
+                user_id=user.id,
+                attempted_username=user.username,
+                success=True,
+                method='google_oauth',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            
+            # Redirect to success page
+            return redirect(url_for('google_success'))
+        else:
+            return f"Error creating user: {message}<br><a href='/'>Go back</a>"
+    
+    except Exception as e:
+        return f"Error during Google authentication: {str(e)}<br><a href='/'>Go back</a>"
+
+@app.route('/auth/google/success')
+def google_success():
+    """Google login success page"""
+    if 'user_id' not in session:
+        return redirect(url_for('index'))
+    
+    user_name = session.get('user_name', 'User')
+    user_email = session.get('user_email', '')
+    avatar_url = session.get('avatar_url', '')
+    auth_method = session.get('auth_method', 'google')
+    
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Google Login Successful</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
+            .success-box { background: #d4edda; border: 2px solid #c3e6cb; padding: 30px; border-radius: 15px; }
+            .avatar { width: 100px; height: 100px; border-radius: 50%; margin: 20px 0; }
+            .button { background: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 5px; 
+                     cursor: pointer; margin: 10px; text-decoration: none; display: inline-block; }
+            .button:hover { background: #45a049; }
+            .info { background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="success-box">
+            <h1>✅ Google Login Successful!</h1>
+            {% if avatar_url %}
+            <img src="{{ avatar_url }}" alt="Avatar" class="avatar">
+            {% endif %}
+            <h2>Welcome, {{ user_name }}!</h2>
+            <p><strong>Email:</strong> {{ user_email }}</p>
+            <p><strong>Authentication:</strong> {{ auth_method }}</p>
+            
+            <div class="info">
+                <h3>🎯 What's Next?</h3>
+                <p>You're now logged in! You can:</p>
+                <ul style="text-align: left; display: inline-block;">
+                    <li>Register your face for faster future logins</li>
+                    <li>Access the full authentication system</li>
+                    <li>Combine Google + Face recognition for maximum security</li>
+                </ul>
+            </div>
+            
+            <a href="/" class="button">🏠 Go to Dashboard</a>
+            <a href="/auth/logout" class="button" style="background: #f44336;">🚪 Logout</a>
+        </div>
+    </body>
+    </html>
+    """, user_name=user_name, user_email=user_email, avatar_url=avatar_url, auth_method=auth_method)
+
+@app.route('/auth/logout')
+def logout():
+    """Logout user"""
+    session.clear()
+    return redirect(url_for('index'))
+
 if __name__ == '__main__':
-    # Ensure upload directories exist
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    # Ensure user_faces directory exists
     os.makedirs('user_faces', exist_ok=True)
     
     print("🚀 Starting Face Recognition Authentication Server...")

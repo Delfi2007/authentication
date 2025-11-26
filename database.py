@@ -16,6 +16,11 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     
+    # Google OAuth fields
+    google_id = db.Column(db.String(100), unique=True, nullable=True)
+    auth_method = db.Column(db.String(20), default='manual')  # 'manual', 'google', 'google+face'
+    avatar_url = db.Column(db.String(500), nullable=True)
+    
     # Relationship with login attempts
     login_attempts = db.relationship('LoginAttempt', backref='user', lazy=True, cascade='all, delete-orphan')
     
@@ -28,7 +33,10 @@ class User(db.Model):
             'is_active': self.is_active,
             'face_registered': self.face_registered,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'google_id': self.google_id,
+            'auth_method': self.auth_method,
+            'avatar_url': self.avatar_url
         }
     
     def __repr__(self):
@@ -169,6 +177,61 @@ def update_last_login(username):
     except Exception as e:
         db.session.rollback()
         return False, f"Error updating last login: {str(e)}"
+
+def get_all_users():
+    """Get all users"""
+    return User.query.all()
+
+def create_google_user(google_id, email, full_name, avatar_url=None):
+    """Create or get a Google-authenticated user"""
+    try:
+        # Check if Google user already exists
+        existing_user = User.query.filter_by(google_id=google_id).first()
+        if existing_user:
+            return existing_user, "Google user already exists"
+        
+        # Check if email is already used
+        existing_email_user = User.query.filter_by(email=email).first()
+        if existing_email_user:
+            # Link Google account to existing user
+            existing_email_user.google_id = google_id
+            existing_email_user.auth_method = 'google+face' if existing_email_user.face_registered else 'google'
+            existing_email_user.avatar_url = avatar_url
+            db.session.commit()
+            return existing_email_user, "Google account linked to existing user"
+        
+        # Create new Google user
+        username = email.split('@')[0]  # Use email prefix as username
+        
+        # Make username unique if it already exists
+        counter = 1
+        original_username = username
+        while User.query.filter_by(username=username).first():
+            username = f"{original_username}_{counter}"
+            counter += 1
+        
+        new_user = User(
+            username=username,
+            email=email,
+            full_name=full_name,
+            google_id=google_id,
+            auth_method='google',
+            avatar_url=avatar_url,
+            is_active=True
+        )
+        
+        db.session.add(new_user)
+        db.session.commit()
+        
+        return new_user, "Google user created successfully"
+    
+    except Exception as e:
+        db.session.rollback()
+        return None, f"Error creating Google user: {str(e)}"
+
+def get_user_by_google_id(google_id):
+    """Get user by Google ID"""
+    return User.query.filter_by(google_id=google_id).first()
 
 def get_all_users():
     """Get all users"""
