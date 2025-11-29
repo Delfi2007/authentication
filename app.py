@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for
+from flask import Flask, request, jsonify, render_template_string, render_template, session, redirect, url_for
 from flask_cors import CORS
 from flask_session import Session
 import os
@@ -623,7 +623,12 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def index():
-    """Main page with testing interface"""
+    """Main authentication page"""
+    return render_template('auth.html')
+
+@app.route('/test')
+def test_page():
+    """Testing interface page"""
     return render_template_string(HTML_TEMPLATE)
 
 @app.route('/register', methods=['POST'])
@@ -836,6 +841,202 @@ def health_check():
         'service': 'Face Recognition Authentication API',
         'version': '1.0.0'
     })
+
+# New Authentication Routes for UI
+@app.route('/signup', methods=['POST'])
+def signup():
+    """Handle email/password signup"""
+    try:
+        email = request.form.get('email')
+        password = request.form.get('password')
+        username = request.form.get('username')
+        
+        if not email or not password or not username:
+            return jsonify({'success': False, 'message': 'All fields are required'})
+        
+        # Check if user already exists
+        existing_user = get_user_by_email(email)
+        if existing_user:
+            return jsonify({'success': False, 'message': 'Email already registered'})
+        
+        existing_user = get_user_by_username(username)
+        if existing_user:
+            return jsonify({'success': False, 'message': 'Username already taken'})
+        
+        # Create new user
+        user = create_email_password_user(
+            username=username,
+            email=email,
+            password=password,
+            full_name=request.form.get('full_name', username)
+        )
+        
+        if user:
+            return jsonify({
+                'success': True, 
+                'message': 'Account created successfully!',
+                'redirect': '/dashboard'
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Failed to create account'})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+@app.route('/face-login', methods=['POST'])
+def face_login():
+    """Handle facial login"""
+    try:
+        # Get image from form data
+        if 'image' not in request.files:
+            return jsonify({'success': False, 'message': 'No image provided'})
+        
+        image_file = request.files['image']
+        
+        # Read the image bytes directly and pass to face system
+        image_bytes = image_file.read()
+        
+        # Recognize face (face_system will handle the conversion)
+        username, confidence, message = face_system.recognize_face(image_bytes)
+        
+        if username:
+            user = get_user_by_username(username)
+            if user and user.is_active:
+                update_last_login(username)
+                session['username'] = username
+                session['user_id'] = user.id
+                
+                log_login_attempt(
+                    user_id=user.id,
+                    attempted_username=username,
+                    success=True,
+                    confidence=confidence,
+                    method='facial_recognition',
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get('User-Agent')
+                )
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'Welcome back, {username}!',
+                    'redirect': '/dashboard'
+                })
+            else:
+                return jsonify({'success': False, 'message': 'User not found or inactive'})
+        else:
+            return jsonify({'success': False, 'message': 'Face not recognized. Please try again or register first.'})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+@app.route('/face-signup', methods=['POST'])
+def face_signup():
+    """Handle facial signup/registration"""
+    try:
+        # Get image and username from form data
+        if 'image' not in request.files:
+            return jsonify({'success': False, 'message': 'No image provided'})
+        
+        image_file = request.files['image']
+        
+        # Get username from form or session
+        username = request.form.get('username') or session.get('pending_face_username')
+        
+        if not username:
+            return jsonify({'success': False, 'message': 'Please provide a username for facial registration'})
+        
+        # Read the image bytes directly
+        image_bytes = image_file.read()
+        
+        # Check if user exists
+        user = get_user_by_username(username)
+        if not user:
+            # Create new user with facial data
+            user = create_user(
+                username=username,
+                email=f"{username}@facial.auth",
+                full_name=username
+            )
+        
+        if user:
+            # Register face (face_system will handle the conversion)
+            success, message = face_system.register_face(username, image_bytes)
+            
+            if success:
+                update_user_face_status(username, True)
+                session['username'] = username
+                session['user_id'] = user.id
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Facial registration successful! You can now login with your face.',
+                    'redirect': '/dashboard'
+                })
+            else:
+                return jsonify({'success': False, 'message': message})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to create user'})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+@app.route('/dashboard')
+def dashboard():
+    """Simple dashboard page"""
+    if 'username' not in session:
+        return redirect(url_for('index'))
+    
+    username = session.get('username')
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Dashboard</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
+            .container {{ background: #f5f5f5; padding: 30px; border-radius: 10px; text-align: center; }}
+            .button {{ background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; text-decoration: none; display: inline-block; }}
+            .button:hover {{ background: #45a049; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Welcome, {username}! 🎉</h1>
+            <p>You have successfully logged in.</p>
+            <a href="/auth/logout" class="button">Logout</a>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/forgot-password')
+def forgot_password():
+    """Forgot password page"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Forgot Password</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }}
+            .container {{ background: #f5f5f5; padding: 30px; border-radius: 10px; }}
+            input {{ width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }}
+            .button {{ background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; width: 100%; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>Reset Password</h2>
+            <p>Enter your email to receive password reset instructions.</p>
+            <form>
+                <input type="email" placeholder="Email Address" required>
+                <button type="submit" class="button">Send Reset Link</button>
+            </form>
+            <p style="text-align: center; margin-top: 20px;"><a href="/">Back to Login</a></p>
+        </div>
+    </body>
+    </html>
+    """
 
 # Google OAuth Routes
 @app.route('/auth/google')

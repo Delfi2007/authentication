@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome - Login & Sign Up</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="auth-wrapper">
+            <div class="auth-card">
+                <!-- Header -->
+                <div class="auth-header">
+                    <h1 class="welcome-text">WELCOME BACK</h1>
+                    <p class="subtitle" id="subtitle">Login to your account</p>
+                </div>
+
+                <!-- Toggle Buttons -->
+                <div class="toggle-container">
+                    <button class="toggle-btn active" id="loginToggle">Login</button>
+                    <button class="toggle-btn" id="signupToggle">Sign Up</button>
+                </div>
+
+                <!-- Login Form -->
+                <div class="form-container" id="loginForm">
+                    <form action="/login" method="POST">
+                        <div class="input-group">
+                            <i class="fas fa-envelope input-icon"></i>
+                            <input type="email" name="email" placeholder="Email Address" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" name="password" id="loginPassword" placeholder="Password" required>
+                            <i class="fas fa-eye toggle-password" onclick="togglePassword('loginPassword')"></i>
+                        </div>
+                        <div class="forgot-password">
+                            <a href="/forgot-password">Forgot Password?</a>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt"></i> Login with Email
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Sign Up Form -->
+                <div class="form-container hidden" id="signupForm">
+                    <form action="/signup" method="POST">
+                        <div class="input-group">
+                            <i class="fas fa-user input-icon"></i>
+                            <input type="text" name="username" placeholder="Username" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="fas fa-envelope input-icon"></i>
+                            <input type="email" name="email" placeholder="Email Address" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" name="password" id="signupPassword" placeholder="Password" required>
+                            <i class="fas fa-eye toggle-password" onclick="togglePassword('signupPassword')"></i>
+                        </div>
+                        <div class="input-group">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" name="confirm_password" id="confirmPassword" placeholder="Confirm Password" required>
+                            <i class="fas fa-eye toggle-password" onclick="togglePassword('confirmPassword')"></i>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-user-plus"></i> Create Account
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Divider -->
+                <div class="divider">
+                    <span>OR</span>
+                </div>
+
+                <!-- Alternative Login Methods -->
+                <div class="alt-auth-methods">
+                    <!-- Google Login -->
+                    <button class="btn btn-google" onclick="loginWithGoogle()">
+                        <i class="fab fa-google"></i>
+                        <span>Continue with Google</span>
+                    </button>
+
+                    <!-- Facial Authentication Buttons -->
+                    <div class="facial-auth-container">
+                        <button class="btn btn-facial" onclick="facialLogin()">
+                            <i class="fas fa-fingerprint"></i>
+                            <span>Facial Login</span>
+                        </button>
+                        <button class="btn btn-facial" onclick="facialSignup()">
+                            <i class="fas fa-user-shield"></i>
+                            <span>Facial Signup</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Footer Links -->
+                <div class="auth-footer">
+                    <p id="footerText">
+                        Don't have an account? <a href="#" id="footerLink">Sign Up</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Facial Authentication Modal -->
+    <div class="modal hidden" id="facialModal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeFacialModal()">&times;</span>
+            <h2 id="modalTitle">Facial Authentication</h2>
+            <div class="camera-container">
+                <video id="video" autoplay></video>
+                <canvas id="canvas" class="hidden"></canvas>
+                <div class="camera-overlay">
+                    <div class="face-frame"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="captureBtn" onclick="captureImage()">
+                    <i class="fas fa-camera"></i> Capture
+                </button>
+                <button class="btn btn-secondary" onclick="closeFacialModal()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+            <p class="modal-hint">Position your face within the frame</p>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="loading-spinner hidden" id="loadingSpinner">
+        <div class="spinner"></div>
+        <p>Processing...</p>
+    </div>
+
+    <!-- Alert Messages -->
+    <div class="alert hidden" id="alertBox">
+        <span id="alertMessage"></span>
+        <button class="close-alert" onclick="closeAlert()">&times;</button>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+</body>
+</html>
