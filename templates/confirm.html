@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Assumed Data - LCA Assessment</title>
+    <link rel="stylesheet" href="/static/css/confirm.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 32 32">
+                    <circle cx="16" cy="16" r="14" fill="#10B981"/>
+                    <path d="M10 16 L14 20 L22 12" stroke="white" stroke-width="2" fill="none"/>
+                </svg>
+                <span>LCA Assessment</span>
+            </div>
+            <div class="user-section">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <button class="btn-logout" onclick="logout()">Logout</button>
+            </div>
+        </header>
+
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div class="progress-step completed">
+                    <div class="step-circle">✓</div>
+                    <div class="step-label">Dataset Selection</div>
+                </div>
+                <div class="progress-line completed"></div>
+                <div class="progress-step completed">
+                    <div class="step-circle">✓</div>
+                    <div class="step-label">Product Input</div>
+                </div>
+                <div class="progress-line active"></div>
+                <div class="progress-step active">
+                    <div class="step-circle">3</div>
+                    <div class="step-label">Confirm Data</div>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step">
+                    <div class="step-circle">4</div>
+                    <div class="step-label">Analysis</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <h1>Confirm Assumed Data</h1>
+            <p class="subtitle">Review the extracted and assumed values. Edit any fields if needed before proceeding with the analysis.</p>
+
+            <!-- AI Extraction Notice -->
+            <div class="info-banner">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="10" r="9" stroke="#3B82F6" stroke-width="2"/>
+                    <path d="M10 6v4M10 14h.01" stroke="#3B82F6" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <div>
+                    <strong>AI Data Extraction</strong>
+                    <p>We've automatically extracted the following information from your natural language input. Please verify the accuracy before continuing.</p>
+                </div>
+            </div>
+
+            <!-- Product Data Summary -->
+            <div class="data-summary-card">
+                <div class="card-header">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM9 11h6M9 15h6" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <h2>Product Data Summary</h2>
+                </div>
+                <p class="card-subtitle">Verify all values before proceeding to analysis</p>
+
+                <div class="data-table">
+                    <div class="table-header">
+                        <div class="col-field">Field</div>
+                        <div class="col-value">Value Used</div>
+                        <div class="col-source">Source</div>
+                        <div class="col-edit">Edit</div>
+                    </div>
+
+                    <!-- Product Name -->
+                    <div class="table-row" data-field="productName">
+                        <div class="col-field">Product Name</div>
+                        <div class="col-value editable" id="value-productName">Loading...</div>
+                        <div class="col-source">
+                            <span class="badge badge-ai" id="source-productName">AI Extracted</span>
+                        </div>
+                        <div class="col-edit">
+                            <button class="btn-edit" onclick="editField('productName')">
+                                <svg width="16" height="16" viewBox="0 0 16 16">
+                                    <path d="M11.5 1.5l3 3-9 9H2.5v-3l9-9z" stroke="currentColor" fill="none"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Material Type -->
+                    <div class="table-row" data-field="materialType">
+                        <div class="col-field">Material Type</div>
+                        <div class="col-value editable" id="value-materialType">Loading...</div>
+                        <div class="col-source">
+                            <span class="badge badge-ai" id="source-materialType">AI Extracted</span>
+                        </div>
+                        <div class="col-edit">
+                            <button class="btn-edit" onclick="editField('materialType')">
+                                <svg width="16" height="16" viewBox="0 0 16 16">
+                                    <path d="M11.5 1.5l3 3-9 9H2.5v-3l9-9z" stroke="currentColor" fill="none"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Weight -->
+                    <div class="table-row" data-field="weight">
+                        <div class="col-field">Weight</div>
+                        <div class="col-value editable" id="value-weight">Loading...</div>
+                        <div class="col-source">
+                            <span class="badge badge-ai" id="source-weight">AI Extracted</span>
+                        </div>
+                        <div class="col-edit">
+                            <button class="btn-edit" onclick="editField('weight')">
+                                <svg width="16" height="16" viewBox="0 0 16 16">
+                                    <path d="M11.5 1.5l3 3-9 9H2.5v-3l9-9z" stroke="currentColor" fill="none"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Recycled Content -->
+                    <div class="table-row" data-field="recycledContent">
+                        <div class="col-field">Recycled Content</div>
+                        <div class="col-value editable" id="value-recycledContent">Loading...</div>
+                        <div class="col-source">
+                            <span class="badge badge-ai" id="source-recycledContent">AI Extracted</span>
+                        </div>
+                        <div class="col-edit">
+                            <button class="btn-edit" onclick="editField('recycledContent')">
+                                <svg width="16" height="16" viewBox="0 0 16 16">
+                                    <path d="M11.5 1.5l3 3-9 9H2.5v-3l9-9z" stroke="currentColor" fill="none"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Lifecycle Stage -->
+                    <div class="table-row" data-field="lifecycleStage">
+                        <div class="col-field">Lifecycle Stage</div>
+                        <div class="col-value editable" id="value-lifecycleStage">Loading...</div>
+                        <div class="col-source">
+                            <span class="badge badge-default" id="source-lifecycleStage">System Default</span>
+                        </div>
+                        <div class="col-edit">
+                            <button class="btn-edit" onclick="editField('lifecycleStage')">
+                                <svg width="16" height="16" viewBox="0 0 16 16">
+                                    <path d="M11.5 1.5l3 3-9 9H2.5v-3l9-9z" stroke="currentColor" fill="none"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Processing Details -->
+                    <div class="table-row" data-field="processingDetails">
+                        <div class="col-field">Processing Details</div>
+                        <div class="col-value editable" id="value-processingDetails">Loading...</div>
+                        <div class="col-source">
+                            <span class="badge badge-ai" id="source-processingDetails">AI Extracted</span>
+                        </div>
+                        <div class="col-edit">
+                            <button class="btn-edit" onclick="editField('processingDetails')">
+                                <svg width="16" height="16" viewBox="0 0 16 16">
+                                    <path d="M11.5 1.5l3 3-9 9H2.5v-3l9-9z" stroke="currentColor" fill="none"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Original Input -->
+            <div class="original-input-card">
+                <h3>Original Input</h3>
+                <div class="original-text" id="originalInput">
+                    Loading original input...
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="btn-secondary" onclick="goBack()">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                        <path d="M10 12L6 8l4-4" stroke="currentColor" fill="none" stroke-width="2"/>
+                    </svg>
+                    Back to Input
+                </button>
+                <button class="btn-primary" onclick="confirmAndContinue()">
+                    Confirm & Continue
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                        <path d="M6 4l4 4-4 4" stroke="currentColor" fill="none" stroke-width="2"/>
+                    </svg>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Edit Field</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label id="modalLabel">Value</label>
+                <input type="text" id="modalInput" class="modal-input">
+                <select id="modalSelect" class="modal-select" style="display: none;">
+                    <option value="aluminum">Aluminum</option>
+                    <option value="steel">Steel</option>
+                    <option value="plastic">Plastic</option>
+                    <option value="glass">Glass</option>
+                    <option value="paper">Paper</option>
+                    <option value="copper">Copper</option>
+                    <option value="composite">Composite</option>
+                </select>
+                <select id="modalLifecycleSelect" class="modal-select" style="display: none;">
+                    <option value="raw-material">Raw Material Extraction</option>
+                    <option value="manufacturing">Manufacturing</option>
+                    <option value="distribution">Distribution</option>
+                    <option value="use">Use Phase</option>
+                    <option value="end-of-life">End of Life</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveEdit()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p>Processing data...</p>
+    </div>
+
+    <script src="/static/js/confirm.js"></script>
+</body>
+</html>

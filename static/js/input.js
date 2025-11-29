@@ -206,8 +206,17 @@ async function performGapFilling(data, missingFields) {
 
 // Proceed to Confirm Page
 function proceedToConfirm(data) {
-    // Store data in session
+    // Get original input text
+    let originalInput = '';
+    if (currentMode === 'nlp') {
+        originalInput = document.getElementById('nlpInput').value;
+    } else {
+        originalInput = `Product: ${data.productName}, Material: ${data.materialType}, Weight: ${data.weight}kg, Recycled Content: ${data.recycledContent}%`;
+    }
+    
+    // Store data and original input in session
     sessionStorage.setItem('productData', JSON.stringify(data));
+    sessionStorage.setItem('originalInput', originalInput);
     
     // Redirect to confirmation page
     window.location.href = '/confirm-data';

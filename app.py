@@ -1763,6 +1763,188 @@ def get_openlca_data():
             'message': f'OpenLCA query error: {str(e)}'
         }), 500
 
+# ========== PAGE 3: DATA CONFIRMATION ==========
+
+@app.route('/confirm-data')
+def confirm_data_page():
+    """Render the data confirmation page"""
+    if 'username' not in session:
+        return redirect('/')
+    return render_template('confirm.html')
+
+@app.route('/api/save-confirmed-data', methods=['POST'])
+def save_confirmed_data():
+    """Save confirmed product data to session for analysis"""
+    try:
+        data = request.json
+        product_data = data.get('productData', {})
+        data_source = data.get('dataSource', 'builtin')
+        
+        # Store in session for next page
+        session['confirmed_product_data'] = product_data
+        session['data_source'] = data_source
+        
+        return jsonify({
+            'success': True,
+            'message': 'Data saved successfully'
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error saving data: {str(e)}'
+        }), 500
+
+# ========== PAGE 4: ANALYSIS & RESULTS (Placeholder) ==========
+
+@app.route('/analysis')
+def analysis_page():
+    """Placeholder for analysis/results page (Page 4)"""
+    if 'username' not in session:
+        return redirect('/')
+    
+    product_data = session.get('confirmed_product_data', {})
+    data_source = session.get('data_source', 'builtin')
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>LCA Analysis - Coming Soon</title>
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0;
+                padding: 20px;
+            }}
+            .container {{
+                background: white;
+                padding: 60px 40px;
+                border-radius: 20px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                text-align: center;
+                max-width: 800px;
+            }}
+            h1 {{
+                color: #10B981;
+                font-size: 48px;
+                margin-bottom: 20px;
+            }}
+            .success-icon {{
+                font-size: 80px;
+                margin-bottom: 30px;
+            }}
+            .info {{
+                background: #F0FDF4;
+                padding: 24px;
+                border-radius: 12px;
+                margin: 30px 0;
+                border-left: 4px solid #10B981;
+            }}
+            .data-summary {{
+                background: #F9FAFB;
+                padding: 24px;
+                border-radius: 12px;
+                text-align: left;
+                margin: 20px 0;
+            }}
+            .data-row {{
+                display: flex;
+                justify-content: space-between;
+                padding: 12px 0;
+                border-bottom: 1px solid #E5E7EB;
+            }}
+            .data-row:last-child {{
+                border-bottom: none;
+            }}
+            .label {{
+                font-weight: 600;
+                color: #374151;
+            }}
+            .value {{
+                color: #6B7280;
+            }}
+            .button {{
+                background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+                color: white;
+                padding: 16px 40px;
+                border: none;
+                border-radius: 10px;
+                font-size: 18px;
+                font-weight: 600;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-block;
+                margin: 10px;
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+                transition: all 0.3s ease;
+            }}
+            .button:hover {{
+                transform: translateY(-2px);
+                box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
+            }}
+            .button-secondary {{
+                background: #6B7280;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="success-icon">🎉</div>
+            <h1>Data Confirmed!</h1>
+            <p style="font-size: 18px; color: #6B7280; margin-bottom: 30px;">
+                Your product data has been successfully confirmed and saved.
+            </p>
+            
+            <div class="info">
+                <h3 style="color: #059669; margin-bottom: 12px;">✅ Data Ready for Analysis</h3>
+                <p style="color: #065F46; margin: 0;">
+                    All required information has been collected and validated. The LCA analysis module is currently under development.
+                </p>
+            </div>
+            
+            <div class="data-summary">
+                <h3 style="color: #374151; margin-bottom: 16px;">Confirmed Product Data:</h3>
+                <div class="data-row">
+                    <span class="label">Product Name:</span>
+                    <span class="value">{product_data.get('productName', 'N/A')}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Material Type:</span>
+                    <span class="value">{product_data.get('materialType', 'N/A').title()}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Weight:</span>
+                    <span class="value">{product_data.get('weight', 'N/A')} kg</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Recycled Content:</span>
+                    <span class="value">{product_data.get('recycledContent', 0)}%</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Lifecycle Stage:</span>
+                    <span class="value">{product_data.get('lifecycleStage', 'N/A').title()}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Data Source:</span>
+                    <span class="value">{data_source.upper()}</span>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px;">
+                <a href="/confirm-data" class="button button-secondary">← Back to Confirmation</a>
+                <a href="/dataset" class="button">Start New Assessment</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
 # ===== Page 2 Helper Functions =====
 
 def extract_product_data_with_groq(text):
