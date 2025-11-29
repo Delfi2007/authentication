@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Input - MetaLCA</title>
+    <link rel="stylesheet" href="static/css/input.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-leaf"></i>
+                <span>MetaLCA</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-step completed">
+                    <div class="step-circle">1</div>
+                    <span>Dataset</span>
+                </div>
+                <div class="progress-line completed"></div>
+                <div class="progress-step active">
+                    <div class="step-circle">2</div>
+                    <span>Input Data</span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step">
+                    <div class="step-circle">3</div>
+                    <span>Confirm</span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step">
+                    <div class="step-circle">4</div>
+                    <span>Results</span>
+                </div>
+            </div>
+            <div class="user-profile">
+                <div class="user-avatar" id="userAvatar">AD</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Page Title -->
+            <div class="page-header">
+                <h1 class="page-title">MetaLCA</h1>
+                <p class="page-subtitle">Enter your product details to analyze environmental impact, circularity metrics, and discover optimization opportunities.</p>
+            </div>
+
+            <!-- Toggle Buttons -->
+            <div class="input-mode-toggle">
+                <button class="toggle-btn active" id="nlpToggle" onclick="switchMode('nlp')">
+                    <i class="fas fa-comment-dots"></i>
+                    Natural Language Input
+                </button>
+                <button class="toggle-btn" id="formToggle" onclick="switchMode('form')">
+                    <i class="fas fa-list-alt"></i>
+                    Structured Form
+                </button>
+            </div>
+
+            <!-- Content Area -->
+            <div class="content-grid">
+                <!-- Left Panel: Input Forms -->
+                <div class="input-panel">
+                    <!-- Natural Language Input Mode -->
+                    <div class="input-mode" id="nlpMode">
+                        <div class="mode-header">
+                            <i class="fas fa-comment-dots"></i>
+                            <h2>Natural Language Input</h2>
+                            <p>Describe your product in natural language and let AI extract the details</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Describe Your Product</label>
+                            <textarea 
+                                id="nlpInput" 
+                                class="nlp-textarea" 
+                                placeholder="e.g., 500g aluminum can with 30% recycled content used for beverage packaging"
+                                rows="6"
+                            ></textarea>
+                            <small class="hint-text">Try including: material type, weight, recycled content percentage, and intended use</small>
+                        </div>
+
+                        <div class="examples-section">
+                            <h3>Quick Examples</h3>
+                            <div class="example-chips">
+                                <button class="example-chip" onclick="fillExample('500g aluminum can with 30% recycled content')">
+                                    500g aluminum can with 30% recycled content
+                                </button>
+                                <button class="example-chip" onclick="fillExample('2kg aluminum alloy sheet with 45% recycled aluminum')">
+                                    2kg aluminum alloy sheet with 45% recycled aluminum
+                                </button>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="analyzeNLP()">
+                            <i class="fas fa-magic"></i> Analyze Product Impact
+                        </button>
+                    </div>
+
+                    <!-- Structured Form Mode -->
+                    <div class="input-mode hidden" id="formMode">
+                        <div class="mode-header">
+                            <i class="fas fa-list-alt"></i>
+                            <h2>Product Data Input</h2>
+                            <p>Provide details about your product's composition and lifecycle</p>
+                        </div>
+
+                        <form id="structuredForm">
+                            <div class="form-group">
+                                <label for="productName">Product Name</label>
+                                <input 
+                                    type="text" 
+                                    id="productName" 
+                                    placeholder="e.g., Recycled Aluminum Sheet"
+                                    class="form-input"
+                                >
+                            </div>
+
+                            <div class="form-section">
+                                <h3>Material Composition</h3>
+                                
+                                <div class="form-group">
+                                    <label>Recycled Content</label>
+                                    <div class="slider-container">
+                                        <input 
+                                            type="range" 
+                                            id="recycledSlider" 
+                                            min="0" 
+                                            max="100" 
+                                            value="40"
+                                            class="slider"
+                                            oninput="updateSliderValue(this)"
+                                        >
+                                        <div class="slider-labels">
+                                            <span>0% Recycled</span>
+                                            <span id="recycledValue" class="slider-value">40%</span>
+                                            <span>100% Recycled</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="weight">Weight (kg)</label>
+                                        <input 
+                                            type="number" 
+                                            id="weight" 
+                                            placeholder="0.5"
+                                            step="0.1"
+                                            class="form-input"
+                                        >
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="materialType">Material Type</label>
+                                        <select id="materialType" class="form-select">
+                                            <option value="">Select material</option>
+                                            <option value="aluminum">Aluminum</option>
+                                            <option value="steel">Steel</option>
+                                            <option value="plastic">Plastic (PE/PP/PET)</option>
+                                            <option value="glass">Glass</option>
+                                            <option value="paper">Paper/Cardboard</option>
+                                            <option value="copper">Copper</option>
+                                            <option value="composite">Composite Material</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3>Lifecycle Stage</h3>
+                                <div class="form-group">
+                                    <label for="lifecycleStage">Select lifecycle stage</label>
+                                    <select id="lifecycleStage" class="form-select">
+                                        <option value="">Select lifecycle stage</option>
+                                        <option value="raw-material">Raw Material Extraction</option>
+                                        <option value="manufacturing">Manufacturing</option>
+                                        <option value="distribution">Distribution/Transport</option>
+                                        <option value="use">Use Phase</option>
+                                        <option value="end-of-life">End of Life</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3>Processing Details (Optional)</h3>
+                                <div class="form-group">
+                                    <label for="processingDetails">Describe manufacturing processes, treatments, or special considerations...</label>
+                                    <textarea 
+                                        id="processingDetails" 
+                                        class="form-textarea"
+                                        rows="3"
+                                        placeholder="e.g., Heat treatment, surface coating, assembly processes..."
+                                    ></textarea>
+                                </div>
+                            </div>
+
+                            <button type="button" class="btn btn-primary" onclick="analyzeStructured()">
+                                <i class="fas fa-chart-line"></i> Calculate Impact
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Smart Hints & Global Averages -->
+                <div class="hints-panel">
+                    <div class="hints-card">
+                        <div class="hints-header">
+                            <i class="fas fa-lightbulb"></i>
+                            <h3>Smart Hints</h3>
+                        </div>
+
+                        <div class="hint-item">
+                            <div class="hint-icon nlp-hint">
+                                <i class="fas fa-info-circle"></i>
+                            </div>
+                            <div class="hint-content">
+                                <h4>NLP tip:</h4>
+                                <p>Be specific about materials - mention "aluminum", "alloy", "steel", etc. for better recognition.</p>
+                            </div>
+                        </div>
+
+                        <div class="hint-item">
+                            <div class="hint-icon weight-hint">
+                                <i class="fas fa-weight"></i>
+                            </div>
+                            <div class="hint-content">
+                                <h4>Weight formats:</h4>
+                                <p>You can use "500g", "0.5kg", "500 grams" - all will be recognized.</p>
+                            </div>
+                        </div>
+
+                        <div class="hint-item">
+                            <div class="hint-icon recycle-hint">
+                                <i class="fas fa-recycle"></i>
+                            </div>
+                            <div class="hint-content">
+                                <h4>Recycled content:</h4>
+                                <p>Mention percentages like "30% recycled" or "contains 25% recycled content".</p>
+                            </div>
+                        </div>
+
+                        <div class="hint-item">
+                            <div class="hint-icon auto-hint">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="hint-content">
+                                <h4>Auto-fill tip:</h4>
+                                <p>Common aluminum sheet contain 25-30% recycled content on average.</p>
+                            </div>
+                        </div>
+
+                        <div class="hint-item">
+                            <div class="hint-icon material-hint">
+                                <i class="fas fa-cube"></i>
+                            </div>
+                            <div class="hint-content">
+                                <h4>Material insight:</h4>
+                                <p>Aluminum has the highest recyclability rate at 75% globally.</p>
+                            </div>
+                        </div>
+
+                        <div class="hint-item">
+                            <div class="hint-icon process-hint">
+                                <i class="fas fa-cogs"></i>
+                            </div>
+                            <div class="hint-content">
+                                <h4>Processing note:</h4>
+                                <p>Include energy-intensive processes for accurate GWP calculation.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="averages-card">
+                        <h3>Global Averages</h3>
+                        <div class="average-item">
+                            <span>Alloy Recycling</span>
+                            <span class="average-value">68%</span>
+                        </div>
+                        <div class="average-item">
+                            <span>Metal Recycling</span>
+                            <span class="average-value">75%</span>
+                        </div>
+                        <div class="average-item">
+                            <span>Plastic Recycling</span>
+                            <span class="average-value">9%</span>
+                        </div>
+                        <div class="average-item">
+                            <span>Glass Recycling</span>
+                            <span class="average-value">33%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p id="loadingText">Processing your product data...</p>
+            <small id="loadingSubtext">Using AI to extract and validate information</small>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div class="alert hidden" id="alertBox">
+        <span id="alertMessage"></span>
+        <button class="close-alert" onclick="closeAlert()">&times;</button>
+    </div>
+
+    <script src="static/js/input.js"></script>
+</body>
+</html>
